@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "vidstash",
+  "version": "0.1.0",
+  "description": "Spot media on the page and hand it to a local yt-dlp daemon.",
+  "permissions": ["webRequest", "storage", "tabs", "cookies"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "vidstash",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

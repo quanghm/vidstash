@@ -1,0 +1,141 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #18181b;
+        --muted: #71717a;
+        --line: #e4e4e7;
+        --accent: #2563eb;
+        --bad: #dc2626;
+        --bg: #fff;
+        --chip: #f4f4f5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #f4f4f5;
+          --muted: #a1a1aa;
+          --line: #3f3f46;
+          --accent: #60a5fa;
+          --bad: #f87171;
+          --bg: #18181b;
+          --chip: #27272a;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 400px;
+        margin: 0;
+        padding: 12px;
+        font: 13px/1.45 system-ui, -apple-system, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      header h1 { font-size: 14px; margin: 0; flex: 1; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+      .dot.ok { background: #16a34a; }
+      .dot.bad { background: var(--bad); }
+      #status { font-size: 11px; color: var(--muted); }
+      h2 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin: 14px 0 6px;
+      }
+      button {
+        font: inherit;
+        font-size: 12px;
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--chip);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button:hover:not(:disabled) { border-color: var(--accent); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        border-top: 1px solid var(--line);
+      }
+      .row .grow { flex: 1; min-width: 0; }
+      .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .url {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        direction: rtl;
+        text-align: left;
+      }
+      .meta { font-size: 11px; color: var(--muted); }
+      .kind {
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--chip);
+        color: var(--muted);
+      }
+      .empty { color: var(--muted); padding: 6px 0; }
+      .bar { height: 4px; border-radius: 2px; background: var(--chip); overflow: hidden; margin-top: 4px; }
+      .bar > i { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
+      .err { color: var(--bad); font-size: 11px; word-break: break-word; }
+      a { color: var(--accent); }
+      .actions { display: flex; gap: 6px; margin-top: 8px; }
+      #offline { padding: 10px; background: var(--chip); border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="dot" id="dot"></span>
+      <h1>vidstash</h1>
+      <span id="status">checking…</span>
+    </header>
+
+    <div id="toast" class="err"></div>
+
+    <div id="offline" hidden>
+      Daemon unreachable. Start it, then check the URL and token in
+      <a href="#" id="open-options">options</a>.
+    </div>
+
+    <div id="main" hidden>
+      <h2>This page</h2>
+      <div class="row">
+        <div class="grow">
+          <div class="title" id="page-title"></div>
+          <div class="url" id="page-url"></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="dl-page">Download</button>
+        <button id="formats-page">Formats…</button>
+      </div>
+      <div id="page-msg"></div>
+
+      <h2>Detected <span id="media-count"></span></h2>
+      <div id="media"></div>
+
+      <h2>Jobs</h2>
+      <div id="jobs"></div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>vidstash options</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        max-width: 520px;
+        margin: 40px auto;
+        padding: 0 20px;
+        font: 14px/1.5 system-ui, -apple-system, sans-serif;
+      }
+      h1 { font-size: 18px; }
+      label { display: block; margin: 18px 0 4px; font-weight: 500; }
+      input[type="text"], input[type="password"] {
+        width: 100%;
+        padding: 7px 9px;
+        font: inherit;
+        font-size: 13px;
+        border: 1px solid #a1a1aa;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+      }
+      .hint { font-size: 12px; color: #71717a; margin-top: 4px; }
+      .check { display: flex; gap: 8px; align-items: flex-start; margin-top: 18px; }
+      .actions { margin-top: 22px; display: flex; gap: 8px; align-items: center; }
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 6px;
+        border: 1px solid #a1a1aa;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+      #msg { font-size: 13px; }
+      code { background: #8882; padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>vidstash</h1>
+    <p class="hint">
+      Start the daemon with <code>vidstash</code>. It prints its URL and token on
+      startup; paste the token below.
+    </p>
+
+    <label for="daemonUrl">Daemon URL</label>
+    <input type="text" id="daemonUrl" spellcheck="false" />
+
+    <label for="token">Token</label>
+    <input type="password" id="token" spellcheck="false" />
+    <div class="hint">
+      Also recoverable with <code>vidstash --print-token</code>.
+    </div>
+
+    <div class="check">
+      <input type="checkbox" id="sendCookies" />
+      <label for="sendCookies" style="margin: 0; font-weight: 400">
+        Send this site's cookies with each request
+        <div class="hint">
+          Needed for anything behind a login. Cookies go only to the daemon on
+          your own machine.
+        </div>
+      </label>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="save">Save</button>
+      <button id="test">Test connection</button>
+      <span id="msg"></span>
+    </div>
+
+    <script src="options.js"></script>
+  </body>
+</html>
