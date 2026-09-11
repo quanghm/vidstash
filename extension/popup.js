@@ -222,7 +222,10 @@ async function init() {
 
   let online = false;
   try {
-    const res = await fetch(`${baseUrl()}/health`);
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const res = await fetch(`${baseUrl()}/health`, { signal: ctl.signal });
+    clearTimeout(timer);
     online = res.ok;
   } catch {
     online = false;

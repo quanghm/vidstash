@@ -1,6 +1,19 @@
 const DEFAULTS = { daemonUrl: "http://127.0.0.1:8723", token: "", sendCookies: true };
+const TIMEOUT_MS = 5000;
 
 const $ = (id) => document.getElementById(id);
+
+// Without a deadline a stalled request leaves the button looking dead, which is
+// indistinguishable from the script never having loaded.
+async function fetchWithTimeout(url, opts = {}) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...opts, signal: ctl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function msg(text, ok) {
   $("msg").textContent = text;
@@ -26,20 +39,34 @@ $("save").addEventListener("click", async () => {
 $("test").addEventListener("click", async () => {
   const base = $("daemonUrl").value.trim().replace(/\/+$/, "");
   const token = $("token").value.trim();
-  try {
-    const health = await fetch(`${base}/health`);
-    if (!health.ok) throw new Error(`daemon returned ${health.status}`);
 
-    const cfg = await fetch(`${base}/config`, {
+  msg("Testing…", true);
+  if (!base) {
+    msg("Set a daemon URL first.", false);
+    return;
+  }
+
+  try {
+    const health = await fetchWithTimeout(`${base}/health`);
+    if (!health.ok) throw new Error(`daemon returned ${health.status} on /health`);
+
+    const cfg = await fetchWithTimeout(`${base}/config`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (cfg.status === 401) throw new Error("daemon reachable, but the token is wrong");
-    if (!cfg.ok) throw new Error(`daemon returned ${cfg.status}`);
+    if (cfg.status === 401) throw new Error("Daemon reachable, but the token is wrong.");
+    if (cfg.status === 403) throw new Error("Daemon refused this origin.");
+    if (!cfg.ok) throw new Error(`daemon returned ${cfg.status} on /config`);
 
     const { download_dir: dir } = await cfg.json();
     msg(`Connected. Saving to ${dir}`, true);
   } catch (err) {
-    msg(err.message === "Failed to fetch" ? "Daemon unreachable." : err.message, false);
+    if (err.name === "AbortError") {
+      msg(`No response within ${TIMEOUT_MS / 1000}s — is the daemon running?`, false);
+    } else if (err.message === "Failed to fetch") {
+      msg(`Could not reach ${base}. Start the daemon, then try again.`, false);
+    } else {
+      msg(err.message, false);
+    }
   }
 });
 
