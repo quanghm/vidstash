@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 
 import uvicorn
 
@@ -18,11 +19,21 @@ def main() -> None:
         action="store_true",
         help="print the API token and exit",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="log yt-dlp debug output (fragment retries, etc.) to the console",
+    )
     args = parser.parse_args()
 
     if args.print_token:
         print(cfg["token"])
         return
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
 
     print(f"vidstash  http://127.0.0.1:{args.port}")
     print(f"  config     {config.config_path()}")

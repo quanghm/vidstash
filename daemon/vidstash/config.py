@@ -17,6 +17,8 @@ DEFAULTS = {
     "download_dir": "",
     "format": "bv*+ba/b",
     "max_concurrent": 2,
+    "ffmpeg_location": "",
+    "concurrent_fragments": 4,
 }
 
 

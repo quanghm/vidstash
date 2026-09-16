@@ -42,3 +42,26 @@ new MutationObserver(schedule).observe(document.documentElement, {
   attributeFilter: ["src"],
 });
 setInterval(report, 3000);
+
+// document.title is often a generic/tracking string (e.g. "VIP_VIP_A...") on
+// video sites; og:title or the page's own heading is usually the real name.
+function bestTitle() {
+  const meta =
+    document.querySelector('meta[property="og:title"]') ||
+    document.querySelector('meta[name="twitter:title"]');
+  const metaTitle = meta?.content?.trim();
+  if (metaTitle) return metaTitle;
+
+  const heading = document.querySelector("h1")?.textContent?.trim();
+  if (heading) return heading;
+
+  return document.title || "";
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "get-page-title") {
+    sendResponse(bestTitle());
+    return false;
+  }
+  return false;
+});

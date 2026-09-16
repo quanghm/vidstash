@@ -2,9 +2,34 @@ const $ = (id) => document.getElementById(id);
 
 let settings = null;
 let tab = null;
+let pageTitle = "";
+const jobRequests = {}; // job id -> { url, formatId, title }, for retrying
 
 const DEFAULTS = { daemonUrl: "http://127.0.0.1:8723", token: "", sendCookies: true };
 const ACTIVE = new Set(["queued", "downloading", "processing"]);
+const STATUS_LABELS = {
+  queued: "Queued…",
+  downloading: "Downloading…",
+  processing: "Processing…",
+  done: "Downloaded",
+};
+let jobsByUrl = new Map();
+
+// Reflects a matching job's state on any [data-url] button (Get/Download buttons),
+// so a video already downloading or downloaded doesn't just offer to fetch it again.
+function refreshActionButtons() {
+  document.querySelectorAll("[data-url]").forEach((btn) => {
+    const job = jobsByUrl.get(btn.dataset.url);
+    const label = job && STATUS_LABELS[job.status];
+    if (label) {
+      btn.textContent = label;
+      btn.disabled = true;
+    } else {
+      btn.textContent = btn.dataset.idle || "Get";
+      btn.disabled = false;
+    }
+  });
+}
 
 function fmtBytes(n) {
   if (!n) return "";
@@ -72,13 +97,15 @@ async function download(url, formatId, title) {
   toast("");
   try {
     const cookies = await cookiesFor(url);
-    await api("/download", {
+    const job = await api("/download", {
       url,
       format_id: formatId ?? null,
       cookies,
       referer: tab.url,
       title: title ?? null,
+      user_agent: navigator.userAgent,
     });
+    jobRequests[job.id] = { url, formatId, title };
     await refreshJobs();
   } catch (err) {
     toast(err.message);
@@ -90,7 +117,7 @@ async function showFormats(url, container) {
   container.appendChild(el("div", "meta", "probing…"));
   try {
     const cookies = await cookiesFor(url);
-    const info = await api("/probe", { url, cookies, referer: tab.url });
+    const info = await api("/probe", { url, cookies, referer: tab.url, user_agent: navigator.userAgent });
 
     container.textContent = "";
     if (info.title) container.appendChild(el("div", "meta", info.title));
@@ -119,7 +146,11 @@ async function showFormats(url, container) {
       );
 
       const btn = el("button", null, "Get");
-      btn.addEventListener("click", () => download(url, f.format_id, info.title));
+      // Prefer the page's real title over yt-dlp's probed one — generic HLS
+      // extractors often produce junk titles (e.g. "VIP_VIP_A...") from the manifest.
+      btn.dataset.url = url;
+      btn.dataset.idle = "Get";
+      btn.addEventListener("click", () => download(url, f.format_id, pageTitle || tab.title || info.title));
 
       row.append(grow, btn);
       container.appendChild(row);
@@ -128,6 +159,7 @@ async function showFormats(url, container) {
     container.textContent = "";
     container.appendChild(el("div", "err", err.message));
   }
+  refreshActionButtons();
 }
 
 async function loadMedia() {
@@ -148,11 +180,14 @@ async function loadMedia() {
     grow.appendChild(el("div", "url", item.url));
 
     const btn = el("button", null, "Get");
-    btn.addEventListener("click", () => download(item.url, null, tab.title));
+    btn.dataset.url = item.url;
+    btn.dataset.idle = "Get";
+    btn.addEventListener("click", () => download(item.url, null, pageTitle || tab.title));
 
     row.append(el("span", "kind", item.kind), grow, btn);
     container.appendChild(row);
   }
+  refreshActionButtons();
 }
 
 async function refreshJobs() {
@@ -169,7 +204,14 @@ async function refreshJobs() {
   container.textContent = "";
   if (!jobs.length) {
     container.appendChild(el("div", "empty", "No jobs yet."));
+    jobsByUrl = new Map();
+    refreshActionButtons();
     return;
+  }
+
+  jobsByUrl = new Map();
+  for (const job of jobs) {
+    if (!jobsByUrl.has(job.url)) jobsByUrl.set(job.url, job);
   }
 
   for (const job of jobs.slice(0, 12)) {
@@ -178,10 +220,20 @@ async function refreshJobs() {
     grow.appendChild(el("div", "title", job.title || job.url));
 
     const bits = [job.status];
-    if (job.percent != null && job.status === "downloading") bits.push(`${job.percent}%`);
+    if (job.status === "downloading" && job.downloaded_bytes != null) {
+      const size = job.total_bytes
+        ? `${fmtBytes(job.downloaded_bytes)}/${fmtBytes(job.total_bytes)}`
+        : fmtBytes(job.downloaded_bytes);
+      bits.push(job.percent != null ? `${size} (${job.percent}%)` : size);
+    }
     if (job.speed) bits.push(`${fmtBytes(job.speed)}/s`);
     if (job.eta != null) bits.push(`ETA ${fmtEta(job.eta)}`);
     grow.appendChild(el("div", "meta", bits.join(" · ")));
+
+    if (job.status === "done" && job.filename) {
+      const name = job.filename.split(/[\\/]/).pop();
+      grow.appendChild(el("div", "meta", name));
+    }
 
     if (job.status === "downloading" || job.status === "processing") {
       const bar = el("div", "bar");
@@ -193,6 +245,15 @@ async function refreshJobs() {
     if (job.error) grow.appendChild(el("div", "err", job.error));
 
     row.appendChild(grow);
+
+    if (job.status === "error" || job.status === "cancelled") {
+      const btn = el("button", null, "Retry");
+      btn.addEventListener("click", () => {
+        const req = jobRequests[job.id] || { url: job.url, formatId: null, title: job.title };
+        download(req.url, req.formatId, req.title);
+      });
+      row.appendChild(btn);
+    }
 
     if (ACTIVE.has(job.status)) {
       const btn = el("button", null, "Stop");
@@ -209,6 +270,7 @@ async function refreshJobs() {
 
     container.appendChild(row);
   }
+  refreshActionButtons();
 }
 
 async function init() {
@@ -239,8 +301,23 @@ async function init() {
 
   $("page-title").textContent = tab.title || "(untitled)";
   $("page-url").textContent = tab.url || "";
-  $("dl-page").addEventListener("click", () => download(tab.url, null, tab.title));
+  try {
+    pageTitle = await chrome.tabs.sendMessage(tab.id, { type: "get-page-title" });
+  } catch {
+    // No content script on this page (e.g. chrome:// URL); fall back to tab.title.
+  }
+  $("dl-page").addEventListener("click", () => download(tab.url, null, pageTitle || tab.title));
+  $("dl-page").dataset.url = tab.url;
+  $("dl-page").dataset.idle = "Download";
   $("formats-page").addEventListener("click", () => showFormats(tab.url, $("page-msg")));
+  $("clear-jobs").addEventListener("click", async () => {
+    try {
+      await api("/jobs/clear", {});
+    } catch (err) {
+      toast(err.message);
+    }
+    refreshJobs();
+  });
 
   await loadMedia();
   await refreshJobs();

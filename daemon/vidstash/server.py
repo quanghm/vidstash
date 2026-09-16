@@ -39,6 +39,7 @@ class ProbeReq(BaseModel):
     url: str
     cookies: list[dict] = []
     referer: str | None = None
+    user_agent: str | None = None
 
 
 class DownloadReq(ProbeReq):
@@ -64,14 +65,16 @@ def get_config() -> dict:
 @app.post("/probe", dependencies=[Depends(auth)])
 def post_probe(req: ProbeReq) -> dict:
     try:
-        return probe(req.url, req.cookies, req.referer)
+        return probe(req.url, req.cookies, req.referer, req.user_agent)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/download", dependencies=[Depends(auth)])
 def post_download(req: DownloadReq) -> dict:
-    return store.submit(req.url, req.format_id, req.cookies, req.referer, req.title)
+    return store.submit(
+        req.url, req.format_id, req.cookies, req.referer, req.title, req.user_agent
+    )
 
 
 @app.get("/jobs", dependencies=[Depends(auth)])
